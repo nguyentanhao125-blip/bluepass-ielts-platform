@@ -1,0 +1,316 @@
+// ============================================================================
+// BluePass English Objective Testing & Practice Platform
+// Prisma Schema (PostgreSQL 16)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  ADMIN
+}
+
+enum Skill {
+  READING
+  LISTENING
+  GRAMMAR_VOCAB
+}
+
+enum TestMode {
+  SINGLE_PASSAGE
+  FULL_TEST
+  PLACEMENT
+  DICTATION
+}
+
+enum TestSource {
+  PRO_PACKAGE
+  SIMULATION
+  COLLECT_REAL
+  CAMBRIDGE_C10_C20
+  ACTUAL_TESTS
+  OTHER
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTI_CHOICE
+  TFNG
+  YNNG
+  MATCHING_HEADINGS
+  MATCHING_INFO
+  MATCHING_FEATURES
+  MAP_DIAGRAM_LABEL
+  GAP_FILL
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum ChatStatus {
+  AI_ACTIVE
+  NEEDS_HUMAN
+  STAFF_ACTIVE
+  RESOLVED
+}
+
+enum SenderRole {
+  STUDENT
+  AI
+  STAFF
+}
+
+enum AnnouncementCategory {
+  PLACEMENT_RESULT
+  CLASS_SCHEDULE
+  EXAM_NOTICE
+  ELIMINATION_NOTICE
+  GENERAL
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  fullName      String
+  studentCode   String    @unique // e.g., "HV-2026-1042"
+  phone         String?
+  targetBand    Float?    @default(7.0)
+  currentLevel  String?   @default("B1 - Intermediate")
+  role          Role      @default(STUDENT)
+  emailVerified DateTime?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  attempts       TestAttempt[]
+  vocabProgress  VocabProgress[]
+  chatThreads    ChatThread[]    @relation("StudentChatThreads")
+  assignedChats  ChatThread[]    @relation("StaffAssignedThreads")
+  announcements  Announcement[]  @relation("AuthorAnnouncements")
+
+  @@index([role])
+  @@index([studentCode])
+}
+
+model Test {
+  id                   String     @id @default(cuid())
+  slug                 String     @unique
+  title                String
+  description          String?
+  skill                Skill      @default(READING)
+  mode                 TestMode   @default(SINGLE_PASSAGE)
+  passageNumber        Int?       // 1, 2, 3 (Reading) or 1, 2, 3, 4 (Listening); null for FULL_TEST
+  source               TestSource @default(COLLECT_REAL)
+  durationMinutes      Int        @default(20)
+  totalQuestions       Int        @default(13)
+  thumbnailUrl         String
+  attemptCount         Int        @default(0)
+  questionTypesSummary String[]   // e.g. ["Gap Filling", "True - False - Not Given"]
+  isPlacement          Boolean    @default(false)
+  isPublished          Boolean    @default(true)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  parts      TestPart[]
+  attempts   TestAttempt[]
+  vocabDecks VocabDeck[]
+
+  @@index([skill, mode, source])
+  @@index([isPlacement, isPublished])
+}
+
+model TestPart {
+  id              String   @id @default(cuid())
+  testId          String
+  partNumber      Int      @default(1)
+  title           String
+  subtitle        String?
+  passageHtml     String?  @db.Text
+  audioUrl        String?
+  audioTranscript String?  @db.Text // Stripped before submission! Revealed only after grading.
+  createdAt       DateTime @default(now())
+
+  test           Test            @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questionGroups QuestionGroup[]
+
+  @@unique([testId, partNumber])
+}
+
+model QuestionGroup {
+  id            String       @id @default(cuid())
+  partId        String
+  orderIndex    Int          @default(1)
+  questionType  QuestionType
+  title         String       // e.g. "Questions 1 - 6"
+  instructions  String       @db.Text
+  sharedOptions Json?        // e.g. List of Headings (i-viii) or List of Researchers (A-E) or Diagram URL
+  wordLimitNote String?      // e.g. "ONE WORD AND/OR A NUMBER"
+
+  part      TestPart   @relation(fields: [partId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@index([partId, orderIndex])
+}
+
+model Question {
+  id             String   @id @default(cuid())
+  groupId        String
+  questionNumber Int
+  prompt         String   @db.Text
+  options        Json?    // Array of { label: "A", value: "A", text: "..." }
+  correctAnswer  String   // NEVER leaked to client before submission! Supports "|" variants e.g. "color|colour"
+  explanation    String?  @db.Text // NEVER leaked to client before submission!
+  points         Int      @default(1)
+
+  group QuestionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, questionNumber])
+}
+
+model TestAttempt {
+  id               String        @id @default(cuid())
+  userId           String
+  testId           String
+  status           AttemptStatus @default(IN_PROGRESS)
+  startedAt        DateTime      @default(now())
+  expiresAt        DateTime      // Authoritative server expiration timestamp
+  submittedAt      DateTime?
+  draftAnswers     Json          @default("{}") // { [questionId]: string | string[] }
+  flaggedQuestions Json          @default("[]") // number[] (question numbers bookmarked in Amber)
+  gradedDetails    Json?         // Populated 100% server-side upon submission
+  rawScore         Int           @default(0)
+  totalQuestions   Int           @default(0)
+  percentageScore  Float         @default(0)
+  bandScore        Float         @default(0)
+  timeSpentSeconds Int           @default(0)
+  tabSwitchCount   Int           @default(0) // Anti-cheat visibilitychange counter
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  test Test @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  // Composite index for Admin Ranking Table: Highest Score -> Shortest Time -> Lowest Tab Switches
+  @@index([testId, status, rawScore(sort: Desc), timeSpentSeconds(sort: Asc), tabSwitchCount(sort: Asc)])
+  @@index([userId, testId, status])
+}
+
+model VocabDeck {
+  id           String   @id @default(cuid())
+  title        String
+  slug         String   @unique
+  category     String   // e.g. "Reading Passage Vocab", "Academic Core C10-C20", "Listening Dictation"
+  level        String   @default("B2 - C1")
+  description  String?
+  linkedTestId String?
+  wordCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  linkedTest Test?       @relation(fields: [linkedTestId], references: [id], onDelete: SetNull)
+  words      VocabWord[]
+}
+
+model VocabWord {
+  id           String   @id @default(cuid())
+  deckId       String
+  word         String
+  partOfSpeech String   // n., v., adj., adv.
+  phonetics    String   // e.g. "/ˈpɒp.kɔːn/"
+  audioUrl     String?
+  meaningVi    String
+  definitionEn String   @db.Text
+  exampleEn    String   @db.Text
+  exampleVi    String?  @db.Text
+  synonyms     String[]
+
+  deck     VocabDeck       @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  progress VocabProgress[]
+
+  @@index([deckId])
+}
+
+model VocabProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  wordId         String
+  status         String   @default("LEARNING") // "NEW" | "LEARNING" | "MASTERED"
+  correctCount   Int      @default(0)
+  lastReviewedAt DateTime @default(now())
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word VocabWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId])
+}
+
+model ChatThread {
+  id              String     @id @default(cuid())
+  userId          String?
+  guestName       String?
+  guestEmail      String?
+  status          ChatStatus @default(AI_ACTIVE)
+  assignedStaffId String?
+  subject         String?    @default("Tư vấn khóa học & Thi xếp lớp")
+  unreadByStaff   Boolean    @default(false)
+  unreadByStudent Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  user          User?         @relation("StudentChatThreads", fields: [userId], references: [id], onDelete: SetNull)
+  assignedStaff User?         @relation("StaffAssignedThreads", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  messages      ChatMessage[]
+
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model ChatMessage {
+  id         String     @id @default(cuid())
+  threadId   String
+  senderRole SenderRole
+  senderName String
+  content    String     @db.Text
+  createdAt  DateTime   @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+model Announcement {
+  id               String               @id @default(cuid())
+  title            String
+  slug             String               @unique
+  category         AnnouncementCategory @default(GENERAL)
+  senderName       String               @default("Phòng Đào Tạo & Khảo Thí")
+  senderDepartment String               @default("Ban Quản Trị BluePass")
+  contentHtml      String               @db.Text
+  attachmentUrl    String?
+  attachmentName   String?
+  placementData    Json?                // Optional structured table of student placement rows
+  isPinned         Boolean              @default(false)
+  isPublished      Boolean              @default(true)
+  targetRoles      String[]             @default(["STUDENT", "STAFF", "ADMIN"])
+  publishedAt      DateTime             @default(now())
+  authorId         String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  author User? @relation("AuthorAnnouncements", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([isPublished, isPinned, publishedAt(sort: Desc)])
+}

@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "BluePass PostgreSQL 16 (VPS Production)",
+      "Group": "BluePass Center Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "bluepass_exam_db",
+      "Username": "bluepass_admin",
+      "SSLMode": "prefer",
+      "Comment": "Pre-configured PostgreSQL 16 connection for the BluePass Academic & Admin Team"
+    }
+  }
+}

@@ -104,8 +104,12 @@ function createInitialStore(): PlatformState {
   };
 }
 
+let diskWriteTimeout: ReturnType<typeof setTimeout> | null = null;
+let pgSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+
 export function saveStoreToDisk(store: PlatformState) {
-  try {
+  if (diskWriteTimeout) clearTimeout(diskWriteTimeout);
+  diskWriteTimeout = setTimeout(() => {
     const serializable = {
       users: store.users,
       passwordHashes: store.passwordHashes,
@@ -116,27 +120,26 @@ export function saveStoreToDisk(store: PlatformState) {
       vocabProgress: store.vocabProgress,
       chatThreads: store.chatThreads,
     };
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(serializable, null, 2), "utf-8");
-  } catch {
-    // Ignore write errors in read-only containers
-  }
+    fs.promises
+      .writeFile(CACHE_FILE_PATH, JSON.stringify(serializable, null, 2), "utf-8")
+      .catch(() => {});
+  }, 300);
 
-  // Real-time background synchronization to PostgreSQL (pgAdmin 4)
-  if (prisma) {
-    syncStateToPrismaClient(prisma, store).catch((err) => {
-      console.error("[pg-sync] Background sync error:", err);
-    });
+  // Debounced non-blocking background synchronization to PostgreSQL (pgAdmin 4)
+  const dbClient = prisma;
+  if (dbClient) {
+    if (pgSyncTimeout) clearTimeout(pgSyncTimeout);
+    pgSyncTimeout = setTimeout(() => {
+      syncStateToPrismaClient(dbClient, store).catch((err) => {
+        console.error("[pg-sync] Background sync error:", err);
+      });
+    }, 1500);
   }
 }
 
 export function getStore(): PlatformState {
   if (!globalForStore.bluepassStore) {
     globalForStore.bluepassStore = createInitialStore();
-    if (prisma) {
-      syncStateToPrismaClient(prisma, globalForStore.bluepassStore).catch((err) => {
-        console.error("[pg-sync] Initial startup sync error:", err);
-      });
-    }
   }
   return globalForStore.bluepassStore;
 }

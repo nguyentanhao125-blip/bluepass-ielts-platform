@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+import { syncStateToPrismaClient } from "./pg-sync";
+import { prisma } from "./prisma";
 import {
   INITIAL_ANNOUNCEMENTS,
   INITIAL_ATTEMPTS,
@@ -118,11 +120,23 @@ export function saveStoreToDisk(store: PlatformState) {
   } catch {
     // Ignore write errors in read-only containers
   }
+
+  // Real-time background synchronization to PostgreSQL (pgAdmin 4)
+  if (prisma) {
+    syncStateToPrismaClient(prisma, store).catch((err) => {
+      console.error("[pg-sync] Background sync error:", err);
+    });
+  }
 }
 
 export function getStore(): PlatformState {
   if (!globalForStore.bluepassStore) {
     globalForStore.bluepassStore = createInitialStore();
+    if (prisma) {
+      syncStateToPrismaClient(prisma, globalForStore.bluepassStore).catch((err) => {
+        console.error("[pg-sync] Initial startup sync error:", err);
+      });
+    }
   }
   return globalForStore.bluepassStore;
 }

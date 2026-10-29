@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, signSessionToken } from "@/lib/session";
 import { getStore, saveStoreToDisk } from "@/lib/store";
+import { notifyNewUserToTelegram } from "@/lib/telegram";
 import { UserProfile } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -74,6 +75,14 @@ export async function POST(req: NextRequest) {
     store.ipRegistrationLog[pending.clientIp].push(Date.now());
 
     saveStoreToDisk(store);
+
+    notifyNewUserToTelegram({
+      fullName: newUser.fullName,
+      email: newUser.email,
+      studentCode: newUser.studentCode,
+      phone: newUser.phone,
+      targetBand: newUser.targetBand,
+    }).catch(() => {});
 
     const token = signSessionToken(newUser);
     const res = NextResponse.json({

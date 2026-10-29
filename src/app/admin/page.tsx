@@ -79,7 +79,8 @@ type AdminTab =
   | "manage-tests"
   | "publish"
   | "chat-inbox"
-  | "vps-db";
+  | "vps-db"
+  | "telegram";
 
 /**
  * Converts plain text paragraphs (copied from Word/PDF/Cambridge books)
@@ -273,6 +274,98 @@ function AdminDashboardContent() {
     const timer = setInterval(fetchStaffChatInbox, 4000);
     return () => clearInterval(timer);
   }, [fetchStaffChatInbox]);
+
+  // Telegram Bot Integration State
+  const [tgBotToken, setTgBotToken] = useState("");
+  const [tgChatId, setTgChatId] = useState("");
+  const [tgBotUsername, setTgBotUsername] = useState("");
+  const [tgEnabled, setTgEnabled] = useState(true);
+  const [tgNotifySubmit, setTgNotifySubmit] = useState(true);
+  const [tgNotifyRegister, setTgNotifyRegister] = useState(true);
+  const [tgNotifyChat, setTgNotifyChat] = useState(true);
+  const [tgLogs, setTgLogs] = useState<
+    { id: string; timestamp: string; direction: "INCOMING" | "OUTGOING"; text: string }[]
+  >([]);
+  const [tgNotice, setTgNotice] = useState<string | null>(null);
+  const [tgLoading, setTgLoading] = useState(false);
+
+  const fetchTelegramStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/telegram");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.botToken && !tgBotToken) setTgBotToken(data.botToken);
+        if (data.adminChatId) setTgChatId(data.adminChatId);
+        if (data.botUsername) setTgBotUsername(data.botUsername);
+        setTgEnabled(data.enabled ?? true);
+        setTgNotifySubmit(data.notifyOnSubmit ?? true);
+        setTgNotifyRegister(data.notifyOnRegister ?? true);
+        setTgNotifyChat(data.notifyOnChat ?? true);
+        setTgLogs(data.logs || []);
+      }
+    } catch {
+      // Ignore
+    }
+  }, [tgBotToken]);
+
+  useEffect(() => {
+    fetchTelegramStatus();
+    const timer = setInterval(fetchTelegramStatus, 5000);
+    return () => clearInterval(timer);
+  }, [fetchTelegramStatus]);
+
+  const handleSaveTelegramConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTgLoading(true);
+    setTgNotice(null);
+    try {
+      const res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save",
+          botToken: tgBotToken,
+          adminChatId: tgChatId,
+          enabled: tgEnabled,
+          notifyOnSubmit: tgNotifySubmit,
+          notifyOnRegister: tgNotifyRegister,
+          notifyOnChat: tgNotifyChat,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTgNotice(`✅ ${data.message}`);
+        if (data.state?.adminChatId) setTgChatId(data.state.adminChatId);
+        if (data.state?.botUsername) setTgBotUsername(data.state.botUsername);
+        if (data.state?.logs) setTgLogs(data.state.logs);
+      } else {
+        setTgNotice(`❌ ${data.error}`);
+      }
+    } finally {
+      setTgLoading(false);
+    }
+  };
+
+  const handleTestTelegramMessage = async () => {
+    setTgLoading(true);
+    setTgNotice(null);
+    try {
+      const res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTgNotice(`🔔 ${data.message}`);
+        if (data.logs) setTgLogs(data.logs);
+      } else {
+        setTgNotice(`❌ ${data.error}`);
+      }
+    } finally {
+      setTgLoading(false);
+    }
+  };
 
   const generatedPreviewHtml = useMemo(
     () => convertPlainTextToIeltsPassageHtml(newTestTitle, newTestPlainText),
@@ -639,6 +732,23 @@ function AdminDashboardContent() {
         >
           <Database className="h-4 w-4" />
           <span>5. Nền Tảng Lưu Trữ Data (PostgreSQL + pgAdmin 4)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("telegram")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-extrabold transition ${
+            activeTab === "telegram"
+              ? "bg-[#0284c7] text-white shadow-xs"
+              : "text-slate-600 hover:bg-[#eff6ff] hover:text-[#0284c7]"
+          }`}
+        >
+          <Send className="h-4 w-4" />
+          <span>6. Kết Nối & Điều Khiển Qua Telegram</span>
+          {tgBotUsername && (
+            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-white">
+              @{tgBotUsername}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1767,6 +1877,221 @@ function AdminDashboardContent() {
                 Kho Git local đã được khởi tạo sẵn trong thư mục dự án. Khi bạn tạo repo trên GitHub cá nhân, chỉ cần chạy{" "}
                 <code className="font-mono font-bold">git push -u origin main</code>.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TAB 6: 2-WAY TELEGRAM BOT MONITORING & REMOTE CONTROL               */}
+      {/* =================================================================== */}
+      {activeTab === "telegram" && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-[#1d4ed8]">
+                  🤖 KẾT NỐI TELEGRAM 2 CHIỀU: THEO DÕI ĐIỂM & NHẮN TIN CẬP NHẬT TRANG WEB
+                </h2>
+                <p className="text-xs text-slate-600">
+                  Nhận thông báo tự động khi học sinh nộp bài / đăng ký tài khoản và nhắn tin trực tiếp trên Telegram để thêm đề, xóa đề, đăng thông báo hoặc trả lời tư vấn!
+                </p>
+              </div>
+              {tgBotUsername && (
+                <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-extrabold text-emerald-800">
+                  ✅ Đang kết nối Bot: @{tgBotUsername} {tgChatId ? `(Chat ID: ${tgChatId})` : ""}
+                </div>
+              )}
+            </div>
+
+            {tgNotice && (
+              <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-3.5 text-xs font-bold text-[#1e3a8a]">
+                {tgNotice}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Config Form */}
+              <form
+                onSubmit={handleSaveTelegramConfig}
+                className="lg:col-span-6 space-y-4 rounded-2xl border border-sky-200 bg-[#f8fafc] p-5"
+              >
+                <div className="rounded-xl bg-[#eff6ff] p-3.5 text-xs text-slate-700 space-y-1">
+                  <div className="font-extrabold text-[#1d4ed8]">
+                    📌 Hướng dẫn lấy mã Bot Token trong 30 giây:
+                  </div>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>
+                      Mở ứng dụng <strong>Telegram</strong>, tìm tài khoản có tích xanh{" "}
+                      <code className="font-mono font-bold text-[#0284c7]">@BotFather</code>.
+                    </li>
+                    <li>
+                      Gõ lệnh <code className="font-mono font-bold">/newbot</code> ➔ đặt tên cho Bot của bạn (ví dụ: <em>BluePass Admin Bot</em> và username kết thúc bằng chữ <em>bot</em>).
+                    </li>
+                    <li>
+                      Copy đoạn mã <strong>HTTP API Token</strong> (dạng <code className="font-mono">7123456789:AAH...</code>) dán vào ô bên dưới rồi nhấn <strong>Lưu & Kết Nối</strong>.
+                    </li>
+                    <li>
+                      Mở Bot vừa tạo trên Telegram, bấm nút <strong>START</strong> (hoặc gõ <code className="font-mono font-bold">/start</code>) — hệ thống sẽ tự động bắt Chat ID của bạn ngay lập tức!
+                    </li>
+                  </ol>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    1. Telegram Bot Token (từ @BotFather) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={tgBotToken}
+                    onChange={(e) => setTgBotToken(e.target.value)}
+                    placeholder="Ví dụ: 7482910384:AAH8x9kL2mP..."
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    2. Admin Chat ID (Tự động điền khi bạn nhắn /start vào Bot)
+                  </label>
+                  <input
+                    type="text"
+                    value={tgChatId}
+                    onChange={(e) => setTgChatId(e.target.value)}
+                    placeholder="Để trống rồi nhắn /start vào Bot, hệ thống sẽ tự nhận diện!"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-mono"
+                  />
+                </div>
+
+                <div className="space-y-2 pt-1 text-xs">
+                  <div className="font-bold text-slate-700">
+                    3. Tự động gửi thông báo về Telegram khi:
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifySubmit}
+                      onChange={(e) => setTgNotifySubmit(e.target.checked)}
+                      className="h-4 w-4 accent-[#0284c7]"
+                    />
+                    <span>Học sinh vừa nộp bài thi (Báo điểm, Band, thời gian & số lần chuyển tab)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifyRegister}
+                      onChange={(e) => setTgNotifyRegister(e.target.checked)}
+                      className="h-4 w-4 accent-[#0284c7]"
+                    />
+                    <span>Học viên mới đăng ký tài khoản thành công</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={tgNotifyChat}
+                      onChange={(e) => setTgNotifyChat(e.target.checked)}
+                      className="h-4 w-4 accent-[#0284c7]"
+                    />
+                    <span>Học viên nhắn tin tư vấn trên web (Cho phép gõ /reply trả lời ngay trên Telegram)</span>
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={tgLoading}
+                    className="rounded-xl bg-[#0284c7] px-5 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+                  >
+                    {tgLoading ? "Đang kết nối..." : "💾 Lưu & Kích Hoạt Bot Telegram"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={tgLoading}
+                    onClick={handleTestTelegramMessage}
+                    className="rounded-xl border border-[#0284c7] bg-white px-4 py-2.5 text-xs font-extrabold text-[#0284c7] hover:bg-[#eff6ff] disabled:opacity-50"
+                  >
+                    🔔 Gửi Tin Nhắn Test Thử
+                  </button>
+                </div>
+              </form>
+
+              {/* Right Column: Command Cheat-Sheet & Activity Log */}
+              <div className="lg:col-span-6 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-900 p-5 text-white space-y-3">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                    ⚡ BẢNG LỆNH NHẮN TIN TRÊN TELEGRAM ĐỂ CẬP NHẬT WEBSITE
+                  </div>
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="rounded-lg bg-slate-800 p-2.5">
+                      <span className="text-sky-400 font-bold">/stats</span> hoặc{" "}
+                      <span className="text-sky-400 font-bold">/diem</span> hoặc{" "}
+                      <span className="text-sky-400 font-bold">/dethi</span>
+                      <div className="text-[11px] font-sans text-slate-300 mt-0.5">
+                        Xem thống kê toàn hệ thống, Top 10 bảng điểm học sinh & danh sách mã ID đề thi.
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-800 p-2.5">
+                      <span className="text-emerald-400 font-bold">
+                        /thongbao Tiêu đề | Nội dung thông báo
+                      </span>
+                      <div className="text-[11px] font-sans text-slate-300 mt-0.5">
+                        Đăng thông báo mới từ Telegram thẳng lên trang Cổng Thông Tin Học Viên (/portal) & cập nhật pgAdmin 4!
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-800 p-2.5">
+                      <span className="text-amber-300 font-bold">
+                        /themde Tên đề | READING | 20 | Đoạn văn | Câu 1 = Đáp án 1
+                      </span>
+                      <div className="text-[11px] font-sans text-slate-300 mt-0.5">
+                        Tạo và xuất bản ngay 1 đề thi mới lên trang chủ từ tin nhắn Telegram!
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-800 p-2.5">
+                      <span className="text-rose-400 font-bold">/xoade mã_id_đề</span>{" "}
+                      &nbsp;|&nbsp;{" "}
+                      <span className="text-purple-300 font-bold">/reply Nội dung trả lời</span>
+                      <div className="text-[11px] font-sans text-slate-300 mt-0.5">
+                        Xóa đề thi từ xa hoặc trả lời tin nhắn tư vấn của học viên trên web ngay từ điện thoại!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+                  <div className="text-xs font-extrabold text-slate-800">
+                    📡 Nhật ký tín hiệu Telegram gần nhất ({tgLogs.length})
+                  </div>
+                  {tgLogs.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">
+                      Chưa có tin nhắn nào. Hãy nhập Bot Token và nhắn /start vào Bot trên Telegram!
+                    </p>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 text-[11px]">
+                      {tgLogs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5"
+                        >
+                          <span
+                            className={`font-bold ${
+                              log.direction === "INCOMING"
+                                ? "text-emerald-700"
+                                : "text-[#0284c7]"
+                            }`}
+                          >
+                            [{log.direction === "INCOMING" ? "NHẬN TỪ TELEGRAM" : "GỬI TỚI TELEGRAM"}]
+                          </span>{" "}
+                          <span className="text-slate-700">{log.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

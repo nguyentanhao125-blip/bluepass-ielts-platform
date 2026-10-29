@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateAiKnowledgeBaseReply, getStore } from "@/lib/store";
+import { generateAiKnowledgeBaseReply, getStore, saveStoreToDisk } from "@/lib/store";
+import { notifySupportChatToTelegram } from "@/lib/telegram";
 import { ChatMessageItem, ChatStatus, SenderRole } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
@@ -164,6 +165,14 @@ export async function POST(req: NextRequest) {
     };
 
     thread.messages.push(aiMsg);
+    saveStoreToDisk(store);
+
+    notifySupportChatToTelegram({
+      studentName: thread.studentName,
+      studentEmail: thread.studentEmail,
+      message: content.trim(),
+      needsHuman: aiResult.shouldEscalateToHuman,
+    }).catch(() => {});
 
     return NextResponse.json({ thread });
   } catch {

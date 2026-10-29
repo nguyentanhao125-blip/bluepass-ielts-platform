@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { calculateIeltsBand, gradeObjectiveQuestion } from "@/lib/grading";
 import { getStore, saveStoreToDisk } from "@/lib/store";
+import { notifyExamSubmissionToTelegram } from "@/lib/telegram";
 import { GradedQuestionResult } from "@/lib/types";
 
 export async function POST(
@@ -150,6 +151,19 @@ export async function POST(
       // Increment attempt counter on the test card
       test.attemptCount += 1;
       saveStoreToDisk(store);
+
+      // Push real-time notification to Admin's Telegram
+      notifyExamSubmissionToTelegram({
+        studentName: attempt.userFullName,
+        studentCode: attempt.userStudentCode,
+        studentEmail: attempt.userEmail,
+        testTitle: attempt.testTitle,
+        rawScore,
+        totalQuestions: totalMaxPoints,
+        bandScore,
+        timeSpentSeconds: elapsedSeconds,
+        tabSwitchCount: attempt.tabSwitchCount,
+      }).catch(() => {});
 
       return NextResponse.json({
         idempotentReplay: false,

@@ -1,0 +1,25 @@
+{
+  "botToken": "9063183494:AAE6C4f5e_6AKGvnsOUHj6LhWb7IO9QhArA",
+  "adminChatId": "7780569684",
+  "botUsername": "SLasvolal_bot",
+  "botFirstName": "TestHao",
+  "enabled": false,
+  "notifyOnSubmit": true,
+  "notifyOnRegister": true,
+  "notifyOnChat": true,
+  "lastUpdateId": 0,
+  "logs": [
+    {
+      "id": "tg-1793292183347-aq9q",
+      "timestamp": "2026-10-29T16:43:03.347Z",
+      "direction": "OUTGOING",
+      "text": "🔔 TIN NHẮN KIỂM TRA TỪ BLUEPASS IELTS\n━━━━━━━━━━━━━━━━━━\n✅ Hệ thống thông báo & điều khiển 2 chiều hoạt động hoàn hảo!\n• Gõ /stats để xem báo cáo dữ liệu\n• Gõ /diem để xem bảng điểm học viên\n• Gõ /help để xem cách đăng thông báo & thêm/xóa đề thi từ Telegram."
+    },
+    {
+      "id": "tg-1793292145061-8di1",
+      "timestamp": "2026-10-29T16:42:25.061Z",
+      "direction": "OUTGOING",
+      "text": "✅ Kết nối BluePass IELTS thành công!\n• Bot: @SLasvolal_bot\n• Admin Chat ID: 7780569684\n👉 Gõ /help để xem toàn bộ các lệnh theo dõi & cập nhật trang web ngay trên Telegram!"
+    }
+  ]
+}

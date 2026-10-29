@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import dns from "dns/promises";
+import { sendOtpVerificationEmail } from "@/lib/mailer";
 import { getStore } from "@/lib/store";
 
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
@@ -172,13 +173,22 @@ export async function POST(req: NextRequest) {
       clientIp,
     };
 
+    // Attempt to send real email to Gmail inbox via smtp.gmail.com:465
+    const mailResult = await sendOtpVerificationEmail({
+      toEmail: normalizedEmail,
+      fullName: fullName.trim(),
+      otpCode,
+    });
+
     return NextResponse.json({
       requiresOtp: true,
       email: normalizedEmail,
-      // In local development without an external SMTP server configured, return demoOtpHint
-      // so the admin/developer can test the 2-step OTP verification screen immediately.
-      demoOtpHint: process.env.SMTP_HOST ? undefined : otpCode,
-      message: `Hệ thống đã gửi mã xác thực OTP 6 chữ số tới hộp thư ${normalizedEmail}. Vui lòng nhập mã OTP để chứng minh Gmail này là thật và thuộc quyền sở hữu của bạn.`,
+      sentRealEmail: mailResult.sentRealEmail,
+      // Only show demoOtpHint when real Gmail App Password hasn't been configured yet
+      demoOtpHint: mailResult.sentRealEmail ? undefined : otpCode,
+      message: mailResult.sentRealEmail
+        ? `✅ Đã gửi email chứa mã OTP 6 chữ số thẳng tới hộp thư Gmail ${normalizedEmail}! Vui lòng mở ứng dụng Gmail của bạn để lấy mã.`
+        : `Hệ thống đã tạo mã OTP cho ${normalizedEmail}. Để gửi thư thật vào hộp thư Gmail, hãy nhập Mật khẩu ứng dụng Google (16 ký tự) ở khung bên dưới.`,
     });
   } catch {
     return NextResponse.json(

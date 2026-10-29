@@ -29,6 +29,10 @@ export default function AuthModal() {
   const [awaitingOtp, setAwaitingOtp] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [demoOtpHint, setDemoOtpHint] = useState<string | null>(null);
+  const [showSmtpSetup, setShowSmtpSetup] = useState(false);
+  const [smtpSenderEmail, setSmtpSenderEmail] = useState("nguyentanhao125@gmail.com");
+  const [smtpAppPass, setSmtpAppPass] = useState("");
+  const [smtpSaving, setSmtpSaving] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +129,34 @@ export default function AuthModal() {
       setError("Lỗi kết nối khi xác thực OTP.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleActivateRealGmailSmtp = async () => {
+    setError(null);
+    setSmtpSaving(true);
+    try {
+      const res = await fetch("/api/admin/smtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          smtpUser: smtpSenderEmail,
+          smtpPass: smtpAppPass,
+          testRecipient: email || smtpSenderEmail,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Không thể kết nối SMTP Gmail.");
+      } else {
+        setDemoOtpHint(null);
+        setShowSmtpSetup(false);
+        setSuccessMsg(data.message);
+      }
+    } catch {
+      setError("Lỗi kết nối khi lưu cấu hình Gmail SMTP.");
+    } finally {
+      setSmtpSaving(false);
     }
   };
 
@@ -234,16 +266,88 @@ export default function AuthModal() {
             )}
 
             {demoOtpHint && (
-              <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                <p className="font-bold">
-                  🔑 Mã OTP xác thực Gmail (Chế độ chạy thử trên máy Local):
-                </p>
-                <p className="mt-1 font-mono text-lg font-black tracking-widest text-[#1d4ed8]">
-                  {demoOtpHint}
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-600">
-                  (Khi cấu hình SMTP trên VPS, mã này chỉ gửi riêng vào hộp thư Gmail thật của người đăng ký; Gmail ảo không có thật sẽ không bao giờ lấy được mã này).
-                </p>
+              <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold">
+                    🔑 Mã OTP tạm thời (Khi chưa gắn Mật khẩu ứng dụng Gmail):
+                  </p>
+                  <span className="font-mono text-base font-black tracking-widest text-[#1d4ed8]">
+                    {demoOtpHint}
+                  </span>
+                </div>
+
+                {!showSmtpSetup ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (email.endsWith("@gmail.com")) {
+                        setSmtpSenderEmail(email);
+                      }
+                      setShowSmtpSetup(true);
+                    }}
+                    className="w-full rounded-lg bg-[#0284c7] px-3 py-2 text-center text-[11px] font-extrabold text-white shadow-xs hover:bg-[#1d4ed8] transition"
+                  >
+                    📧 Bấm vào đây để kết nối Gmail gửi thư OTP thật về hộp thư của bạn
+                  </button>
+                ) : (
+                  <div className="rounded-lg border border-sky-200 bg-white p-3 space-y-2.5 text-slate-700">
+                    <div className="font-extrabold text-[#1d4ed8]">
+                      ⚡ Kích hoạt gửi Email OTP thật qua Google SMTP (30 giây):
+                    </div>
+                    <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-600">
+                      <li>
+                        Bấm mở trang chính thức của Google:{" "}
+                        <a
+                          href="https://myaccount.google.com/apppasswords"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-[#0284c7] underline"
+                        >
+                          myaccount.google.com/apppasswords
+                        </a>
+                      </li>
+                      <li>
+                        Gõ tên ứng dụng bất kỳ (VD: <code className="font-bold">BluePass</code>) rồi nhấn <strong>Tạo (Create)</strong>.
+                      </li>
+                      <li>
+                        Copy <strong>16 chữ cái mật khẩu ứng dụng</strong> Google hiện ra trên màn hình vàng và dán vào ô dưới đây:
+                      </li>
+                    </ol>
+                    <input
+                      type="email"
+                      value={smtpSenderEmail}
+                      onChange={(e) => setSmtpSenderEmail(e.target.value)}
+                      placeholder="Gmail dùng để gửi thư (VD: nguyentanhao125@gmail.com)"
+                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold"
+                    />
+                    <input
+                      type="text"
+                      value={smtpAppPass}
+                      onChange={(e) => setSmtpAppPass(e.target.value)}
+                      placeholder="Dán 16 ký tự Google App Password (VD: abcd efgh ijkl mnop)"
+                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-mono"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpSetup(false)}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600"
+                      >
+                        Đóng
+                      </button>
+                      <button
+                        type="button"
+                        disabled={smtpSaving}
+                        onClick={handleActivateRealGmailSmtp}
+                        className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {smtpSaving
+                          ? "Đang kết nối smtp.gmail.com..."
+                          : "✅ Lưu & Gửi Ngay Thư OTP Thật Tới Gmail"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

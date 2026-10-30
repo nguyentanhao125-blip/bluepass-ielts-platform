@@ -226,25 +226,30 @@ function PracticeBankContent() {
     };
   };
 
+  const getSourceLabel = (source: TestSource) => {
+    const found = SOURCE_OPTIONS.find((s) => s.value === source);
+    return found ? found.label : "Cambridge Academic";
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Sub-Navigation Skill Tabs (Replicating Reading | Listening | Thi Xếp Lớp Bar under Primary Navbar) */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1360px] items-center justify-center gap-6 px-4">
+    <div className="min-h-screen bg-[#f4f7fb] academic-light-grid">
+      {/* Sub-Navigation Skill Tabs (Academic Discipline Selector Bar) */}
+      <div className="border-b border-slate-200/90 bg-white/90 backdrop-blur-xs shadow-2xs">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-center gap-4 sm:gap-8 px-4">
           <button
             onClick={() => {
               setSelectedSkill("READING");
               setSelectedMode("SINGLE_PASSAGE");
               setSelectedPassage(null);
             }}
-            className={`flex items-center gap-2 border-b-2 py-3 px-2 text-sm font-bold transition ${
+            className={`flex items-center gap-2 border-b-2 py-3.5 px-3 text-xs sm:text-sm font-extrabold transition ${
               selectedSkill === "READING" && selectedMode !== "PLACEMENT"
-                ? "border-[#0284c7] text-[#0284c7]"
+                ? "border-[#0284c7] text-[#1e3a8a] bg-[#eff6ff]/50"
                 : "border-transparent text-slate-600 hover:text-[#0284c7]"
             }`}
           >
             <BookOpen className="h-4 w-4 text-[#0284c7]" />
-            <span>Reading</span>
+            <span>IELTS Academic Reading</span>
           </button>
 
           <span className="text-slate-200">|</span>
@@ -255,14 +260,14 @@ function PracticeBankContent() {
               setSelectedMode("SINGLE_PASSAGE");
               setSelectedPassage(null);
             }}
-            className={`flex items-center gap-2 border-b-2 py-3 px-2 text-sm font-bold transition ${
+            className={`flex items-center gap-2 border-b-2 py-3.5 px-3 text-xs sm:text-sm font-extrabold transition ${
               selectedSkill === "LISTENING" && selectedMode !== "PLACEMENT"
-                ? "border-[#0284c7] text-[#0284c7]"
+                ? "border-[#0284c7] text-[#1e3a8a] bg-[#eff6ff]/50"
                 : "border-transparent text-slate-600 hover:text-[#0284c7]"
             }`}
           >
             <Headphones className="h-4 w-4 text-amber-500" />
-            <span>Listening</span>
+            <span>IELTS Academic Listening</span>
           </button>
 
           <span className="text-slate-200">|</span>
@@ -273,28 +278,28 @@ function PracticeBankContent() {
               setSelectedMode("PLACEMENT");
               setSelectedPassage(null);
             }}
-            className={`flex items-center gap-2 border-b-2 py-3 px-2 text-sm font-bold transition ${
+            className={`flex items-center gap-2 border-b-2 py-3.5 px-3 text-xs sm:text-sm font-extrabold transition ${
               selectedMode === "PLACEMENT"
-                ? "border-[#1d4ed8] text-[#1d4ed8]"
+                ? "border-[#1d4ed8] text-[#1d4ed8] bg-[#eff6ff]/50"
                 : "border-transparent text-slate-600 hover:text-[#1d4ed8]"
             }`}
           >
             <GraduationCap className="h-4 w-4 text-[#1d4ed8]" />
-            <span>Thi Xếp Lớp (Placement Test)</span>
+            <span>Kỳ Thi Xếp Lớp (Placement Test)</span>
           </button>
 
           <span className="text-slate-200 hidden sm:inline">|</span>
 
           <button
             onClick={resetAllFilters}
-            className={`hidden sm:flex items-center gap-2 border-b-2 py-3 px-2 text-sm font-bold transition ${
+            className={`hidden sm:flex items-center gap-2 border-b-2 py-3.5 px-3 text-xs sm:text-sm font-extrabold transition ${
               selectedSkill === "ALL" && selectedMode === "ALL"
-                ? "border-[#0284c7] text-[#0284c7]"
+                ? "border-[#0284c7] text-[#1e3a8a] bg-[#eff6ff]/50"
                 : "border-transparent text-slate-600 hover:text-[#0284c7]"
             }`}
           >
             <Sparkles className="h-4 w-4 text-sky-500" />
-            <span>Tất cả đề thi ({tests.length})</span>
+            <span>Toàn bộ Ngân hàng đề ({tests.length})</span>
           </button>
         </div>
       </div>
@@ -589,34 +594,76 @@ function PracticeBankContent() {
         </aside>
 
         {/* ================================================================= */}
-        {/* MAIN CONTENT AREA (Banner + Search + 4-Column Responsive Grid)    */}
+        {/* MAIN CONTENT AREA (Scholarly Hero + Search + 4-Column Grid)       */}
         {/* ================================================================= */}
         <div className="flex-1 min-w-0">
-          {/* Top CTA Banner (Replicating YouPass Banner in Royal/Ocean Blue Theme) */}
-          <div className="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-[#0284c7]/30 bg-gradient-to-r from-[#eff6ff] via-white to-[#dbeafe]/60 px-6 py-4 shadow-xs">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0284c7] to-[#1d4ed8] text-white shadow-md">
-                <ShieldCheck className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-extrabold text-slate-900">
-                  <span className="mr-1.5 inline-block rounded-md bg-[#0284c7] px-2 py-0.5 text-xs font-bold text-white">
-                    Phá đảo tất cả
-                  </span>
-                  dạng đề IELTS & Học Thuật cùng BluePass!
+          {/* Prestigious Oxford & Cambridge Academic Hero Banner */}
+          <div className="relative mb-6 overflow-hidden rounded-3xl border border-[#1e3a8a]/30 bg-gradient-to-br from-[#0f172a] via-[#1e3a8a] to-[#0284c7] p-6 sm:p-7 text-white shadow-xl academic-grid-pattern">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2.5 max-w-2xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-amber-300">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>Cambridge Assessment & Academic Placement System</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight leading-snug text-white">
+                  Ngân Hàng Đề Khảo Thí IELTS Học Thuật & Đánh Giá Xếp Lớp Chuẩn Quốc Tế
                 </h1>
-                <p className="mt-1 text-xs text-slate-600">
-                  Chốt đầu vào, mục tiêu, thời gian với hệ thống chấm tự động 100% từ máy chủ và nhận lộ trình xếp lớp chuẩn xác!
+                <p className="text-xs sm:text-[13px] leading-relaxed text-sky-100/90">
+                  Trải nghiệm giao diện phòng thi máy tính chuẩn Inspera (Split-Screen Reading & HTTP Range Audio), chấm điểm tự động 100% từ máy chủ, phân tích giải thích chi tiết từng câu và đề xuất lộ trình lớp học theo khung tham chiếu Châu Âu (CEFR B1–C2).
                 </p>
               </div>
+
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+                <Link
+                  href="/exam/test-placement-2026"
+                  className="flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-xs font-black text-slate-950 shadow-lg hover:bg-amber-300 hover:scale-[1.02] transition whitespace-nowrap"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Thi Xếp Lớp Đầu Vào Ngay</span>
+                </Link>
+                <Link
+                  href="/portal"
+                  className="flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-4 py-3 text-xs font-bold text-white backdrop-blur-xs hover:bg-white/20 transition whitespace-nowrap"
+                >
+                  <span>Bảng Xếp Hạng & Phân Lớp</span>
+                </Link>
+              </div>
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <Link
-                href="/exam/test-placement-2026"
-                className="rounded-full bg-gradient-to-r from-[#0284c7] to-[#1d4ed8] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:opacity-95 transition whitespace-nowrap"
-              >
-                Thi Xếp Lớp Ngay
-              </Link>
+
+            {/* 4 Scholarly Metric Strip Cards inside Hero */}
+            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-white/15 text-xs">
+              <div className="rounded-2xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs border border-white/10">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-200">
+                  Kho Đề Học Thuật
+                </p>
+                <p className="mt-0.5 text-sm font-black text-white">
+                  {tests.length} Bộ Đề Chuẩn C10–C20
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs border border-white/10">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-200">
+                  Mục Tiêu Của Bạn
+                </p>
+                <p className="mt-0.5 text-sm font-black text-amber-300">
+                  IELTS {(currentUser.targetBand ?? 7.0).toFixed(1)}+ ({currentUser.studentCode})
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs border border-white/10">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-200">
+                  Cơ Chế Chấm Thi
+                </p>
+                <p className="mt-0.5 text-sm font-black text-emerald-300">
+                  100% Server-Side
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-3.5 py-2.5 backdrop-blur-xs border border-white/10">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-200">
+                  Giám Sát Phòng Thi
+                </p>
+                <p className="mt-0.5 text-sm font-black text-sky-200">
+                  Anti-Cheat Tab-Track
+                </p>
+              </div>
             </div>
           </div>
 
@@ -719,64 +766,84 @@ function PracticeBankContent() {
                   <Link
                     key={test.id}
                     href={`/exam/${test.id}`}
-                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs hover:border-[#0284c7] hover:shadow-md transition-all"
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs hover:-translate-y-1 hover:border-[#0284c7] hover:shadow-xl transition-all duration-200"
                   >
                     {/* Thumbnail Container */}
-                    <div className="relative h-36 w-full overflow-hidden bg-slate-200">
+                    <div className="relative h-38 w-full overflow-hidden bg-slate-900">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={test.thumbnailUrl}
                         alt={test.title}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-105 group-hover:opacity-100"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/15 to-transparent" />
 
-                      {/* Top-Left Attempt Count Pill (Exact match to Screenshot: `(A) 7520 lượt làm bài`) */}
-                      <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-slate-900/75 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-xs">
+                      {/* Top-Left Attempt Count Pill */}
+                      <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-slate-900/80 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-xs border border-white/15">
                         <UserCheck className="h-3 w-3 text-sky-300" />
                         <span>
-                          {test.attemptCount.toLocaleString("vi-VN")} lượt làm bài
+                          {test.attemptCount.toLocaleString("vi-VN")} lượt thi
                         </span>
                       </div>
 
+                      {/* Top-Right Completion Status Badge */}
+                      {test.isCompletedByUser && (
+                        <div className="absolute right-2.5 top-2.5 rounded-full bg-emerald-500/95 px-2.5 py-0.5 text-[10px] font-extrabold text-white shadow-xs">
+                          ✓ Đã hoàn thành
+                        </div>
+                      )}
+
                       {/* Bottom-Left Passage / Part Badge */}
                       <div
-                        className={`absolute bottom-2 left-2 rounded-lg px-2.5 py-0.5 text-[11px] font-bold shadow-xs ${badge.className}`}
+                        className={`absolute bottom-2.5 left-2.5 rounded-lg px-2.5 py-0.5 text-[11px] font-extrabold shadow-xs ${badge.className}`}
                       >
                         {badge.label}
                       </div>
 
                       {/* Hover Start Indicator */}
-                      <div className="absolute right-2 bottom-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#0284c7] opacity-0 shadow-sm transition group-hover:opacity-100">
+                      <div className="absolute right-2.5 bottom-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-slate-950 opacity-0 shadow-md transition group-hover:opacity-100">
                         <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
                       </div>
                     </div>
 
                     {/* Card Body */}
-                    <div className="flex flex-1 flex-col justify-between p-3.5">
+                    <div className="flex flex-1 flex-col justify-between p-4">
                       <div>
-                        <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-slate-900 group-hover:text-[#0284c7] transition">
+                        {/* Academic Source & CEFR Tag Row */}
+                        <div className="mb-1.5 flex items-center justify-between gap-1 text-[10px] font-bold">
+                          <span className="truncate rounded bg-[#eff6ff] px-2 py-0.5 text-[#1e3a8a] border border-sky-200/70">
+                            {getSourceLabel(test.source)}
+                          </span>
+                          <span className="shrink-0 font-mono text-slate-400">
+                            {test.isPlacement ? "CEFR B1–C2" : "Band 5.5–8.5"}
+                          </span>
+                        </div>
+
+                        <h3 className="line-clamp-2 text-[13px] font-extrabold leading-snug text-slate-900 group-hover:text-[#0284c7] transition">
                           {test.title}
                         </h3>
 
-                        {/* Bulleted Question Types List */}
-                        <ul className="mt-2 space-y-0.5 text-[11px] font-medium text-slate-500">
-                          {test.questionTypesSummary.map((qt) => (
-                            <li key={qt} className="flex items-center gap-1.5">
-                              <span className="h-1 w-1 rounded-full bg-slate-400 shrink-0" />
-                              <span className="truncate">{qt}</span>
-                            </li>
+                        {/* Scholarly Question Type Chips */}
+                        <div className="mt-2.5 flex flex-wrap gap-1">
+                          {test.questionTypesSummary.slice(0, 3).map((qt) => (
+                            <span
+                              key={qt}
+                              className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600"
+                            >
+                              {qt}
+                            </span>
                           ))}
-                        </ul>
+                        </div>
                       </div>
 
                       {/* Bottom Meta Footer */}
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-400">
-                        <span className="flex items-center gap-1 font-medium text-slate-500">
-                          <Clock className="h-3 w-3 text-[#0284c7]" />
+                      <div className="mt-3.5 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px]">
+                        <span className="flex items-center gap-1 font-semibold text-slate-500">
+                          <Clock className="h-3.5 w-3.5 text-[#0284c7]" />
                           {test.durationMinutes} phút • {test.totalQuestions} câu
                         </span>
-                        <span className="font-bold text-[#0284c7] group-hover:translate-x-0.5 transition">
-                          Làm bài →
+                        <span className="font-extrabold text-[#1d4ed8] group-hover:text-[#0284c7] group-hover:translate-x-0.5 transition">
+                          Vào phòng thi →
                         </span>
                       </div>
                     </div>

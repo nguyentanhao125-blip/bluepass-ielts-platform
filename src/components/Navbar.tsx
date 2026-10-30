@@ -38,28 +38,54 @@ export default function Navbar() {
     currentUser.role === "ADMIN" || currentUser.role === "STAFF";
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white shadow-sm">
+    <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-200/80">
+      {/* Row 0: Institutional Academic Top Ribbon */}
+      <div className="bg-[#0f172a] text-[11px] text-slate-300 border-b border-white/10">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-1.5">
+          <div className="flex items-center gap-2 font-medium truncate">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-amber-300 uppercase tracking-wider">
+              Viện Khảo Thí Học Thuật BluePass
+            </span>
+            <span className="hidden md:inline text-slate-500">|</span>
+            <span className="hidden md:inline text-slate-300">
+              Chuẩn đánh giá Cambridge IELTS Academic & Khung tham chiếu Châu Âu (CEFR B1–C2)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-sky-200">
+              🎯 Mục tiêu: IELTS {(currentUser.targetBand ?? 7.0).toFixed(1)}
+            </span>
+            <span className="hidden lg:inline text-slate-500">•</span>
+            <span className="hidden lg:inline text-[10px] font-semibold text-emerald-300">
+              ✓ Bảo mật đề thi Server-Side 100%
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Row 1: Top Utility Bar */}
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0284c7] to-[#1d4ed8] text-white font-extrabold text-lg shadow-sm">
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#0f172a] via-[#1e3a8a] to-[#0284c7] text-white font-black text-lg shadow-md ring-2 ring-amber-400/50 group-hover:scale-105 transition">
             BP
           </div>
           <div>
             <div className="flex items-center gap-1">
-              <span className="text-xl font-black tracking-tight text-[#0284c7]">
+              <span className="text-xl font-black tracking-tight text-[#0f172a]">
                 Blue
               </span>
-              <span className="text-xl font-black tracking-tight text-[#1d4ed8]">
+              <span className="text-xl font-black tracking-tight text-[#0284c7]">
                 Pass
               </span>
-              <span className="ml-1 rounded-md bg-[#eff6ff] px-1.5 py-0.5 text-[10px] font-bold text-[#0284c7] border border-sky-200">
-                IELTS & ACADEMIC
+              <span className="ml-1.5 rounded-md bg-gradient-to-r from-[#eff6ff] to-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-[#1e3a8a] border border-sky-200/80">
+                IELTS ACADEMIC
               </span>
             </div>
-            <p className="text-[10px] font-medium text-slate-400 -mt-1">
-              Developed by BluePass Testing Center
+            <p className="text-[10px] font-semibold text-slate-400 -mt-0.5">
+              Cambridge Assessment & Placement Portal
             </p>
           </div>
         </Link>
@@ -176,9 +202,9 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Row 2: Royal/Ocean Blue Primary Navigation Bar (Strict RBAC: Admin tab hidden from Students!) */}
-      <nav className="bg-gradient-to-r from-[#0284c7] via-[#0369a1] to-[#1d4ed8] text-white shadow-inner">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-1 overflow-x-auto px-4 py-1.5 no-scrollbar text-xs sm:text-sm">
+      {/* Row 2: Oxford & Royal Blue Primary Navigation Bar (Strict RBAC: Admin tab hidden from Students!) */}
+      <nav className="bg-gradient-to-r from-[#0f172a] via-[#1e3a8a] to-[#0284c7] text-white shadow-md">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-1.5 overflow-x-auto px-4 py-2 no-scrollbar text-xs sm:text-[13px]">
           <Link
             href="/portal?tab=profile"
             className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 font-semibold text-sky-50 hover:bg-white/15 transition"

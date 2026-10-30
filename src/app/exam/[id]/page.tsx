@@ -72,8 +72,10 @@ export default function ExamRunnerPage() {
     { partNumber: number; title: string; audioTranscript: string | null }[]
   >([]);
 
-  // Reading Passage UX Tools (Font size, Highlighter, Notes)
+  // Reading Passage UX Tools (Font size, Serif/Sans Academic Mode, Warm Paper Mode, Highlighter, Notes)
   const [fontSize, setFontSize] = useState<"sm" | "base" | "lg">("base");
+  const [useAcademicSerif, setUseAcademicSerif] = useState<boolean>(true);
+  const [warmPaperMode, setWarmPaperMode] = useState<boolean>(false);
   const [highlightColor, setHighlightColor] = useState<
     "yellow" | "blue" | "green"
   >("yellow");
@@ -720,6 +722,34 @@ export default function ExamRunnerPage() {
                   </button>
                 </div>
 
+                {/* Academic Serif / Sans Font Switcher */}
+                <button
+                  type="button"
+                  onClick={() => setUseAcademicSerif((s) => !s)}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                    useAcademicSerif
+                      ? "border-[#1e3a8a] bg-[#1e3a8a] text-white"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                  title="Chuyển đổi giữa Font báo học thuật Cambridge (Serif) và Font hiện đại (Sans)"
+                >
+                  {useAcademicSerif ? "Font Học Thuật (Serif)" : "Font Hiện Đại (Sans)"}
+                </button>
+
+                {/* Warm Ivory Paper Reading Mode Switcher */}
+                <button
+                  type="button"
+                  onClick={() => setWarmPaperMode((w) => !w)}
+                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                    warmPaperMode
+                      ? "border-amber-400 bg-amber-100 text-amber-950"
+                      : "border-slate-200 bg-white text-slate-700"
+                  }`}
+                  title="Chế độ nền giấy kem chống mỏi mắt khi đọc bài dài"
+                >
+                  {warmPaperMode ? "📜 Nền Giấy Kem" : "📄 Nền Trắng"}
+                </button>
+
                 {/* Font Size Switcher */}
                 <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-[11px] font-bold">
                   {(
@@ -747,7 +777,11 @@ export default function ExamRunnerPage() {
           </div>
 
           {/* Left Pane Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div
+            className={`flex-1 overflow-y-auto p-6 transition-colors ${
+              warmPaperMode ? "bg-[#fdfaf2]" : "bg-white"
+            }`}
+          >
             {currentPart.subtitle && (
               <div className="mb-4 rounded-xl border border-sky-100 bg-[#eff6ff] px-4 py-2.5 text-xs font-medium text-[#1d4ed8]">
                 {currentPart.subtitle}
@@ -884,17 +918,21 @@ export default function ExamRunnerPage() {
               </div>
             )}
 
-            {/* Reading Passage HTML with Highlight Support */}
+            {/* Reading Passage HTML with Highlight Support & Academic Typography */}
             {currentPart.passageHtml && (
               <div
                 ref={passageContainerRef}
                 onMouseUp={handleHighlightSelection}
-                className={`prose max-w-none select-text ${
+                className={`prose max-w-none select-text rounded-2xl border p-5 sm:p-6 shadow-2xs transition-colors ${
+                  warmPaperMode
+                    ? "border-amber-200/80 bg-[#fffdf7] text-slate-900"
+                    : "border-slate-200/80 bg-white text-slate-800"
+                } ${useAcademicSerif ? "academic-passage-serif" : ""} ${
                   fontSize === "sm"
                     ? "text-xs leading-relaxed"
                     : fontSize === "lg"
-                    ? "text-base leading-loose"
-                    : "text-sm leading-relaxed"
+                    ? "text-[17px] leading-loose"
+                    : "text-[15px] leading-[1.85]"
                 }`}
                 dangerouslySetInnerHTML={{ __html: currentPart.passageHtml }}
               />

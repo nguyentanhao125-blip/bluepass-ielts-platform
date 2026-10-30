@@ -4,9 +4,51 @@
 
 @layer base {
   body {
-    @apply bg-[#f8fafc] text-slate-800 antialiased;
+    @apply bg-[#f4f7fb] text-slate-800 antialiased selection:bg-[#0284c7]/20 selection:text-[#0f172a];
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+/* Subtle Scholarly Blueprint Grid Pattern */
+.academic-grid-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.academic-light-grid {
+  background-image: linear-gradient(to right, rgba(2, 132, 199, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(2, 132, 199, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Authentic Cambridge / Oxford Academic Reading Passage Typography */
+.academic-passage-serif {
+  font-family: "Georgia", "Cambria", "Times New Roman", serif;
+  letter-spacing: 0.01em;
+}
+
+.academic-passage-serif p {
+  margin-bottom: 1.05rem;
+  text-align: justify;
+}
+
+/* Smooth Scholarly Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
 }
 
 .no-scrollbar::-webkit-scrollbar {

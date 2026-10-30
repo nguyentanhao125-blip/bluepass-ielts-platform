@@ -93,3 +93,41 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const caller = getAuthenticatedUser(req);
+  if (!caller || (caller.role !== "ADMIN" && caller.role !== "STAFF")) {
+    return NextResponse.json(
+      {
+        error:
+          "Truy cập bị từ chối (403 Forbidden): Chỉ Quản trị viên (ADMIN) hoặc Tư vấn viên (STAFF) mới có quyền xóa thông báo.",
+      },
+      { status: 403 }
+    );
+  }
+
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json(
+      { error: "Thiếu mã ID thông báo cần xóa." },
+      { status: 400 }
+    );
+  }
+
+  const store = getStore();
+  const existing = store.announcements.find((a) => a.id === id);
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Không tìm thấy thông báo cần xóa." },
+      { status: 404 }
+    );
+  }
+
+  store.announcements = store.announcements.filter((a) => a.id !== id);
+  saveStoreToDisk(store);
+
+  return NextResponse.json({
+    success: true,
+    message: `Đã xóa thông báo "${existing.title}" khỏi Cổng Thông Tin Học Viên!`,
+  });
+}

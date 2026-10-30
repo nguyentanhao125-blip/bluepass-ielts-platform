@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 >nul
-title BluePass IELTS - May Chu Web + Ten Mien Mien Phi (Cloudflare / bluepass.lvh.me)
+title BluePass IELTS - https://bluepass-ielts.serveousercontent.com
 echo ============================================================================
-echo   BLUEPASS IELTS - KHOI DONG MAY CHU SIEU TOC + TEN MIEN MIEN PHI
+echo   BLUEPASS IELTS - KHOI DONG MAY CHU + TEN MIEN CONG KHAI CO DINH
 echo ============================================================================
 
 cd /d "%~dp0"
@@ -12,11 +12,14 @@ start "BluePass Production Server" /MIN cmd /c "npm.cmd run start"
 timeout /t 2 /nobreak >nul
 
 echo.
-echo   🌐 Link ten mien BluePass tren may:  http://bluepass.lvh.me:3000
-echo   👑 Link Admin BluePass tren may:     http://bluepass.lvh.me:3000/admin
+echo   🌐 Link Cong Khai Co Dinh:  https://bluepass-ielts.serveousercontent.com
+echo   👑 Link Admin Cong Khai:    https://bluepass-ielts.serveousercontent.com/admin
+echo   💻 Link Tren May Tinh:      http://bluepass.lvh.me:3000
 echo.
-echo [2/2] Dang mo duong truyen Internet cong khai qua Cloudflare Tunnel...
+echo [2/2] Dang giu ket noi ten mien https://bluepass-ielts.serveousercontent.com (Tu dong ket noi lai 24/7)...
 echo ============================================================================
 echo.
-"%LOCALAPPDATA%\cloudflared\cloudflared.exe" tunnel --url http://localhost:3000 --no-autoupdate
-pause
+:loop
+ssh.exe -T -o StrictHostKeyChecking=no -o ServerAliveInterval=20 -o ServerAliveCountMax=3 -R bluepass-ielts:80:localhost:3000 serveo.net
+timeout /t 2 /nobreak >nul
+goto loop

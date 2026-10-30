@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/session";
 import { generateAiKnowledgeBaseReply, getStore, saveStoreToDisk } from "@/lib/store";
 import { notifySupportChatToTelegram } from "@/lib/telegram";
-import { ChatMessageItem, ChatStatus, SenderRole } from "@/lib/types";
+import { ChatMessageItem, ChatStatus, ChatThreadItem, SenderRole } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   const store = getStore();
@@ -9,6 +10,17 @@ export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get("mode"); // "staff" returns all threads
 
   if (mode === "staff") {
+    const caller = getAuthenticatedUser(req);
+    if (!caller || (caller.role !== "ADMIN" && caller.role !== "STAFF")) {
+      return NextResponse.json(
+        {
+          error:
+            "Truy cập bị từ chối (403 Forbidden): Chỉ Quản trị viên hoặc Tư vấn viên mới được xem toàn bộ hộp thư học viên.",
+        },
+        { status: 403 }
+      );
+    }
+
     const sorted = [...store.chatThreads].sort((a, b) => {
       // Prioritize NEEDS_HUMAN at the very top of Staff Inbox
       if (a.status === "NEEDS_HUMAN" && b.status !== "NEEDS_HUMAN") return -1;
@@ -22,8 +34,16 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const thread =
-    store.chatThreads.find((t) => t.id === threadId) || store.chatThreads[0];
+  const caller = getAuthenticatedUser(req);
+  let thread = store.chatThreads.find((t) => t.id === threadId);
+
+  // If the student does not have a dedicated thread yet, create or return their personal thread
+  if (!thread && caller && caller.role === "STUDENT") {
+    thread = store.chatThreads.find((t) => t.studentEmail === caller.email);
+  }
+  if (!thread) {
+    thread = store.chatThreads[0];
+  }
 
   return NextResponse.json({
     thread,
@@ -33,6 +53,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const store = getStore();
+    const caller = getAuthenticatedUser(req);
     const body = await req.json();
     const {
       threadId = "thread-student-1",
@@ -50,12 +71,51 @@ export async function POST(req: NextRequest) {
       targetStatus?: ChatStatus;
     } = body;
 
+    // Enforce RBAC for Staff-only actions
+    if (action === "STAFF_TAKEOVER" || senderRole === "STAFF") {
+      if (!caller || (caller.role !== "ADMIN" && caller.role !== "STAFF")) {
+        return NextResponse.json(
+          {
+            error:
+              "Truy cập bị từ chối (403 Forbidden): Học viên không thể giả mạo phản hồi của Tư vấn viên.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     let thread = store.chatThreads.find((t) => t.id === threadId);
+    const nowIso = new Date().toISOString();
+
+    if (!thread && caller && caller.role === "STUDENT") {
+      const newThread: ChatThreadItem = {
+        id: threadId.startsWith("thread-") ? threadId : `thread-${caller.id}`,
+        studentName: caller.fullName,
+        studentEmail: caller.email,
+        studentCode: caller.studentCode,
+        subject: "Tư vấn lộ trình & Hỗ trợ học viên",
+        status: "AI_ACTIVE",
+        unreadByStaff: false,
+        unreadByStudent: false,
+        updatedAt: nowIso,
+        messages: [
+          {
+            id: `msg-welcome-${Date.now()}`,
+            threadId: threadId.startsWith("thread-") ? threadId : `thread-${caller.id}`,
+            senderRole: "AI",
+            senderName: "Trợ lý AI BluePass",
+            content: `Xin chào ${caller.fullName} (${caller.studentCode})! Mình là Trợ lý AI học thuật của BluePass. Bạn cần tư vấn về kết quả Thi Xếp Lớp, lộ trình IELTS hay đặt lịch với Giáo viên?`,
+            createdAt: nowIso,
+          },
+        ],
+      };
+      store.chatThreads.unshift(newThread);
+      thread = newThread;
+    }
+
     if (!thread) {
       thread = store.chatThreads[0];
     }
-
-    const nowIso = new Date().toISOString();
 
     // 1. Handle Explicit Status Transitions (Student clicking "Gặp nhân viên tư vấn" or Staff takeover)
     if (action === "REQUEST_HUMAN") {
@@ -73,12 +133,13 @@ export async function POST(req: NextRequest) {
         createdAt: nowIso,
       };
       thread.messages.push(sysMsg);
+      saveStoreToDisk(store);
       return NextResponse.json({ thread });
     }
 
     if (action === "STAFF_TAKEOVER") {
       thread.status = "STAFF_ACTIVE";
-      thread.assignedStaffName = senderName || "Trần Thanh Thảo (Tư vấn viên)";
+      thread.assignedStaffName = senderName || caller?.fullName || "Trần Thanh Thảo (Tư vấn viên)";
       thread.unreadByStaff = false;
       thread.updatedAt = nowIso;
 
@@ -91,6 +152,7 @@ export async function POST(req: NextRequest) {
         createdAt: nowIso,
       };
       thread.messages.push(joinMsg);
+      saveStoreToDisk(store);
       return NextResponse.json({ thread });
     }
 
@@ -109,6 +171,7 @@ export async function POST(req: NextRequest) {
         createdAt: nowIso,
       };
       thread.messages.push(aiMsg);
+      saveStoreToDisk(store);
       return NextResponse.json({ thread });
     }
 
@@ -138,6 +201,7 @@ export async function POST(req: NextRequest) {
       thread.status = "STAFF_ACTIVE";
       thread.unreadByStaff = false;
       thread.unreadByStudent = true;
+      saveStoreToDisk(store);
       return NextResponse.json({ thread });
     }
 
@@ -145,6 +209,13 @@ export async function POST(req: NextRequest) {
     // If thread is already NEEDS_HUMAN or STAFF_ACTIVE, do NOT let AI interrupt human staff!
     if (thread.status === "NEEDS_HUMAN" || thread.status === "STAFF_ACTIVE") {
       thread.unreadByStaff = true;
+      saveStoreToDisk(store);
+      notifySupportChatToTelegram({
+        studentName: thread.studentName,
+        studentEmail: thread.studentEmail,
+        message: content.trim(),
+        needsHuman: true,
+      }).catch(() => {});
       return NextResponse.json({ thread });
     }
 

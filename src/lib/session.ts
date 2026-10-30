@@ -57,8 +57,8 @@ export function verifySessionToken(token: string | undefined): SessionPayload | 
 }
 
 /**
- * Extracts and verifies the current user from the request's HTTP-only session cookie
- * (or verified x-user-id header synced with store).
+ * Extracts and verifies the current user from the request's HTTP-only session cookie.
+ * ADMIN and STAFF privileges strictly require a valid cryptographically signed cookie.
  */
 export function getAuthenticatedUser(req: NextRequest): UserProfile | null {
   const store = getStore();
@@ -70,11 +70,11 @@ export function getAuthenticatedUser(req: NextRequest): UserProfile | null {
     if (found) return found;
   }
 
-  // Fallback check via explicit header if cookie not yet set on first request
+  // Fallback check via header ONLY for non-privileged STUDENT demo sessions
   const headerUserId = req.headers.get("x-user-id");
   if (headerUserId) {
     const found = store.users.find((u) => u.id === headerUserId);
-    if (found) return found;
+    if (found && found.role === "STUDENT") return found;
   }
 
   return null;

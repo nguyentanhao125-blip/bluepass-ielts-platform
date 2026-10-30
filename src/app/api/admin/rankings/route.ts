@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { suggestPlacementClass } from "@/lib/grading";
-import { getStore } from "@/lib/store";
+import { getAuthenticatedUser } from "@/lib/session";
+import { getStore, saveStoreToDisk } from "@/lib/store";
+
+function maskEmailForStudent(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return "***";
+  const prefix = local.slice(0, Math.min(3, local.length));
+  return `${prefix}***@${domain}`;
+}
 
 export async function GET(req: NextRequest) {
   const store = getStore();
+  const caller = getAuthenticatedUser(req);
+  const isStaffOrAdmin =
+    caller !== null && (caller.role === "ADMIN" || caller.role === "STAFF");
   const { searchParams } = req.nextUrl;
 
   const testId = searchParams.get("testId") || "ALL";
@@ -52,7 +63,7 @@ export async function GET(req: NextRequest) {
     attemptId: item.id,
     studentCode: item.userStudentCode,
     fullName: item.userFullName,
-    email: item.userEmail,
+    email: isStaffOrAdmin ? item.userEmail : maskEmailForStudent(item.userEmail),
     testId: item.testId,
     testTitle: item.testTitle,
     skill: item.testSkill,
@@ -75,6 +86,7 @@ export async function GET(req: NextRequest) {
 
   // ===========================================================================
   // EXCEL / CSV EXPORT MODE (?format=csv)
+  // Full unmasked emails & anti-cheat logs for ADMIN/STAFF; masked emails for STUDENT
   // Includes UTF-8 BOM (\uFEFF) so Microsoft Excel opens Vietnamese characters cleanly
   // ===========================================================================
   if (format === "csv") {
@@ -147,5 +159,43 @@ export async function GET(req: NextRequest) {
       title: t.title,
       isPlacement: t.isPlacement,
     })),
+  });
+}
+
+export async function DELETE(req: NextRequest) {
+  const caller = getAuthenticatedUser(req);
+  if (!caller || caller.role !== "ADMIN") {
+    return NextResponse.json(
+      {
+        error:
+          "Truy cập bị từ chối (403 Forbidden): Chỉ Quản trị viên tối cao (ADMIN) mới có quyền xóa kết quả thi.",
+      },
+      { status: 403 }
+    );
+  }
+
+  const attemptId = req.nextUrl.searchParams.get("attemptId");
+  if (!attemptId) {
+    return NextResponse.json(
+      { error: "Thiếu mã ID lượt thi cần xóa." },
+      { status: 400 }
+    );
+  }
+
+  const store = getStore();
+  const target = store.attempts.find((a) => a.id === attemptId);
+  if (!target) {
+    return NextResponse.json(
+      { error: "Không tìm thấy lượt thi cần xóa." },
+      { status: 404 }
+    );
+  }
+
+  store.attempts = store.attempts.filter((a) => a.id !== attemptId);
+  saveStoreToDisk(store);
+
+  return NextResponse.json({
+    success: true,
+    message: `Đã xóa lượt thi của học viên "${target.userFullName}" (${target.testTitle}) khỏi bảng xếp hạng!`,
   });
 }

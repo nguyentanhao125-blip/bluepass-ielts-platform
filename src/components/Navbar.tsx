@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Home,
   LogIn,
+  LogOut,
   Search,
   ShieldAlert,
   Sparkles,
@@ -23,6 +24,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const {
     currentUser,
+    logout,
     setIsAuthModalOpen,
     unreadAnnouncementsCount,
   } = useApp();
@@ -159,6 +161,18 @@ export default function Navbar() {
             </div>
             <LogIn className="h-3.5 w-3.5 text-[#0284c7] ml-0.5" />
           </button>
+
+          {(currentUser.role !== "STUDENT" ||
+            currentUser.id !== "user-student-1") && (
+            <button
+              onClick={logout}
+              className="flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-100 transition"
+              title="Đăng xuất về chế độ Học viên mặc định"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Đăng xuất</span>
+            </button>
+          )}
         </div>
       </div>
 

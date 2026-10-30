@@ -7,7 +7,8 @@ import { Role, UserProfile } from "@/lib/types";
 interface AppContextValue {
   currentUser: UserProfile;
   setCurrentUser: (user: UserProfile) => void;
-  switchDemoRole: (role: Role) => void;
+  switchDemoRole: (role: Role) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   unreadAnnouncementsCount: number;
@@ -21,20 +22,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(2);
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("bluepass_current_user");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.id) {
-          setCurrentUserState(parsed);
-        }
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
-
   const setCurrentUser = (user: UserProfile) => {
     setCurrentUserState(user);
     try {
@@ -44,10 +31,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const switchDemoRole = (role: Role) => {
+  // Synchronize client user state with server's signed HTTP-only cookie (`GET /api/auth/me`)
+  useEffect(() => {
+    let active = true;
+    async function verifySessionWithServer() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data.user && data.user.id) {
+            setCurrentUser(data.user);
+            return;
+          }
+        }
+      } catch {
+        // Fallback to localStorage only if offline
+        try {
+          const saved = localStorage.getItem("bluepass_current_user");
+          if (saved && active) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.id) {
+              setCurrentUserState(parsed);
+            }
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    verifySessionWithServer();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const switchDemoRole = async (role: Role) => {
     const found =
       INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: found.email, password: "123456" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setCurrentUser(data.user);
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
     setCurrentUser(found);
+  };
+
+  const logout = async () => {
+    try {
+      const res = await fetch("/api/auth/me", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setCurrentUser(data.user);
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+    setCurrentUser(INITIAL_USERS[0]);
   };
 
   return (
@@ -56,6 +109,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         currentUser,
         setCurrentUser,
         switchDemoRole,
+        logout,
         isAuthModalOpen,
         setIsAuthModalOpen,
         unreadAnnouncementsCount,

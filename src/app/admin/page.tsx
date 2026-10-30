@@ -30,12 +30,15 @@ import {
 import { useApp } from "@/context/AppContext";
 import {
   AnnouncementCategory,
+  AnnouncementItem,
   ChatThreadItem,
   PlacementRow,
   QuestionType,
+  Role,
   Skill,
   TestMode,
   TestSource,
+  UserProfile,
 } from "@/lib/types";
 
 interface RankedSubmission {
@@ -204,6 +207,15 @@ function AdminDashboardContent() {
   const [staffReplyInput, setStaffReplyInput] = useState<string>("");
   const [needsHumanCount, setNeedsHumanCount] = useState<number>(0);
 
+  // Tab 3 & Tab 5: Announcements List & RBAC Users Management State
+  const [publishedAnnouncements, setPublishedAnnouncements] = useState<
+    AnnouncementItem[]
+  >([]);
+  const [adminUsers, setAdminUsers] = useState<
+    (UserProfile & { attemptCount?: number })[]
+  >([]);
+  const [userRbacNotice, setUserRbacNotice] = useState<string | null>(null);
+
   useEffect(() => {
     const t = searchParams.get("tab") as AdminTab | null;
     if (
@@ -214,6 +226,7 @@ function AdminDashboardContent() {
         "publish",
         "chat-inbox",
         "vps-db",
+        "telegram",
       ].includes(t)
     ) {
       setActiveTab(t);
@@ -251,10 +264,41 @@ function AdminDashboardContent() {
     }
   }, []);
 
+  const fetchAnnouncementsForAdmin = useCallback(async () => {
+    try {
+      const res = await fetch("/api/announcements");
+      if (res.ok) {
+        const data = await res.json();
+        setPublishedAnnouncements(data.announcements || []);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const fetchUsersForAdmin = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) {
+        const data = await res.json();
+        setAdminUsers(data.users || []);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
   useEffect(() => {
     fetchRankings();
     fetchAllTestsForAdmin();
-  }, [fetchRankings, fetchAllTestsForAdmin]);
+    fetchAnnouncementsForAdmin();
+    fetchUsersForAdmin();
+  }, [
+    fetchRankings,
+    fetchAllTestsForAdmin,
+    fetchAnnouncementsForAdmin,
+    fetchUsersForAdmin,
+  ]);
 
   const fetchStaffChatInbox = useCallback(async () => {
     try {
@@ -578,11 +622,87 @@ function AdminDashboardContent() {
           "🎉 Đã đăng Thông báo & Danh sách Xếp lớp chính thức lên Cổng Thông Tin Học Viên (UEH Portal)!"
         );
         setUnreadAnnouncementsCount(3);
+        fetchAnnouncementsForAdmin();
       } else {
         setPublishSuccess(`❌ ${data.error}`);
       }
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string, title: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Bạn có chắc chắn muốn xóa thông báo "${title}" không?`)
+    ) {
+      return;
+    }
+    const res = await fetch(
+      `/api/announcements?id=${encodeURIComponent(id)}`,
+      { method: "DELETE" }
+    );
+    const data = await res.json();
+    if (res.ok) {
+      setPublishSuccess(`🗑️ ${data.message}`);
+      fetchAnnouncementsForAdmin();
+    } else {
+      setPublishSuccess(`❌ ${data.error}`);
+    }
+  };
+
+  const handleDeleteAttempt = async (attemptId: string, studentName: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Xóa lượt thi của học viên "${studentName}" khỏi Bảng Xếp Hạng?`
+      )
+    ) {
+      return;
+    }
+    const res = await fetch(
+      `/api/admin/rankings?attemptId=${encodeURIComponent(attemptId)}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      fetchRankings();
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: Role) => {
+    setUserRbacNotice(null);
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role: newRole }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setUserRbacNotice(`✅ ${data.message}`);
+      fetchUsersForAdmin();
+    } else {
+      setUserRbacNotice(`❌ ${data.error}`);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, fullName: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Xóa vĩnh viễn tài khoản "${fullName}" khỏi hệ thống?`)
+    ) {
+      return;
+    }
+    setUserRbacNotice(null);
+    const res = await fetch(
+      `/api/admin/users?id=${encodeURIComponent(userId)}`,
+      { method: "DELETE" }
+    );
+    const data = await res.json();
+    if (res.ok) {
+      setUserRbacNotice(`🗑️ ${data.message}`);
+      fetchUsersForAdmin();
+    } else {
+      setUserRbacNotice(`❌ ${data.error}`);
     }
   };
 
@@ -667,6 +787,67 @@ function AdminDashboardContent() {
         </div>
       </div>
 
+      {/* 3-Tier RBAC Matrix Status Banner */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div
+          className={`rounded-2xl border p-3.5 transition ${
+            currentUser.role === "ADMIN"
+              ? "border-amber-400 bg-amber-50/70 ring-2 ring-amber-300/40"
+              : "border-slate-200 bg-white opacity-75"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-black text-amber-900">
+              👑 TẦNG 1: QUẢN TRỊ VIÊN (ADMIN)
+            </span>
+            {currentUser.role === "ADMIN" && (
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-slate-950">
+                ĐANG KÍCH HOẠT
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-slate-600">
+            Toàn quyền: Đăng/Xóa đề thi, Xóa lượt thi rác, Đăng/Xóa thông báo, Phân quyền tài khoản (RBAC), Cấu hình Bot Telegram & Gmail SMTP.
+          </p>
+        </div>
+
+        <div
+          className={`rounded-2xl border p-3.5 transition ${
+            currentUser.role === "STAFF"
+              ? "border-emerald-400 bg-emerald-50/70 ring-2 ring-emerald-300/40"
+              : "border-slate-200 bg-white opacity-75"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-black text-emerald-900">
+              🎧 TẦNG 2: TƯ VẤN VIÊN / GIÁO VIÊN (STAFF)
+            </span>
+            {currentUser.role === "STAFF" && (
+              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">
+                ĐANG KÍCH HOẠT
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-slate-600">
+            Quyền Đào tạo: Xem điểm & Xuất Excel, Đăng thông báo xếp lớp, Trả lời Hộp thư Tư vấn học viên. (Bị khóa quyền Xóa đề & Hệ thống).
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 opacity-75">
+          <div className="flex items-center justify-between">
+            <span className="font-black text-[#0284c7]">
+              🎓 TẦNG 3: HỌC VIÊN (STUDENT)
+            </span>
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700">
+              CHẶN /ADMIN (403)
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-600">
+            Chỉ được làm bài thi, học từ vựng, xem thông báo & chat tư vấn. Tự động ẩn đáp án trước khi nộp bài và ẩn email học viên khác.
+          </p>
+        </div>
+      </div>
+
       {/* Admin Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xs">
         <button
@@ -731,7 +912,7 @@ function AdminDashboardContent() {
           }`}
         >
           <Database className="h-4 w-4" />
-          <span>5. Nền Tảng Lưu Trữ Data (PostgreSQL + pgAdmin 4)</span>
+          <span>5. Phân Quyền Tài Khoản (RBAC) & Database ({adminUsers.length})</span>
         </button>
 
         <button
@@ -834,6 +1015,9 @@ function AdminDashboardContent() {
                   <th className="px-3.5 py-3">Thời Gian Hoàn Thành</th>
                   <th className="px-3.5 py-3">Giám Sát Chuyển Tab</th>
                   <th className="px-3.5 py-3">Lớp Gợi Ý</th>
+                  {currentUser.role === "ADMIN" && (
+                    <th className="px-3.5 py-3 text-right">Xóa</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
@@ -914,6 +1098,20 @@ function AdminDashboardContent() {
                       <td className="px-3.5 py-3 font-bold text-slate-800">
                         {row.suggestedClass}
                       </td>
+                      {currentUser.role === "ADMIN" && (
+                        <td className="px-3.5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteAttempt(row.attemptId, row.fullName)
+                            }
+                            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 transition"
+                            title="Xóa lượt thi này (Chỉ ADMIN)"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -1688,6 +1886,63 @@ function AdminDashboardContent() {
               </span>
             </button>
           </div>
+
+          {/* Existing Published Announcements List with Delete Action */}
+          <div className="border-t border-slate-200 pt-5 space-y-3">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#1d4ed8]">
+              📋 Danh Sách Thông Báo Đang Hiển Thị Trên Cổng Học Viên ({publishedAnnouncements.length})
+            </h3>
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#eff6ff] text-[#1d4ed8] font-extrabold uppercase">
+                  <tr>
+                    <th className="px-3.5 py-2.5">Tiêu đề thông báo</th>
+                    <th className="px-3.5 py-2.5">Phân loại</th>
+                    <th className="px-3.5 py-2.5">Đơn vị gửi</th>
+                    <th className="px-3.5 py-2.5">Ngày đăng</th>
+                    <th className="px-3.5 py-2.5 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {publishedAnnouncements.map((ann) => (
+                    <tr key={ann.id} className="hover:bg-slate-50">
+                      <td className="px-3.5 py-2.5 font-bold text-slate-900">
+                        {ann.isPinned && (
+                          <span className="mr-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-800">
+                            GHIM
+                          </span>
+                        )}
+                        {ann.title}
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-[#0284c7]">
+                          {ann.category}
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-slate-600 font-semibold">
+                        {ann.senderName}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-slate-500">
+                        {new Date(ann.publishedAt).toLocaleDateString("vi-VN")}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteAnnouncement(ann.id, ann.title)
+                          }
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-600 hover:text-white transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Xóa</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </form>
       )}
 
@@ -1819,64 +2074,182 @@ function AdminDashboardContent() {
       )}
 
       {/* =================================================================== */}
-      {/* TAB 5: VPS DOCKER & PGADMIN 4 MULTI-USER DATABASE MANAGEMENT INFO   */}
+      {/* TAB 5: RBAC USER MANAGEMENT & POSTGRESQL 18 / PGADMIN 4 DATABASE    */}
       {/* =================================================================== */}
       {activeTab === "vps-db" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eff6ff] text-[#0284c7]">
-              <Database className="h-6 w-6" />
+        <div className="space-y-6">
+          {/* RBAC User & Permission Management Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-base font-extrabold text-[#1d4ed8]">
+                  🛡️ QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN HỆ THỐNG (RBAC: ADMIN • STAFF • STUDENT)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Mọi tài khoản đăng ký mới qua Gmail OTP hoặc Google OAuth 2.0 đều mặc định là STUDENT. Chỉ ADMIN mới có quyền nâng/hạ cấp độ phân quyền tại đây!
+                </p>
+              </div>
+              <span className="rounded-xl bg-[#eff6ff] px-3.5 py-2 text-xs font-extrabold text-[#0284c7] border border-sky-200">
+                Tổng số tài khoản: {adminUsers.length}
+              </span>
             </div>
-            <div>
-              <h2 className="text-base font-extrabold text-[#1d4ed8]">
-                CÁC ỨNG DỤNG QUẢN LÝ DATA CỦA HỆ THỐNG (WEB ADMIN + PGADMIN 4 + PRISMA STUDIO)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Bạn không cần tải thêm phần mềm ngoài: quản lý trực tiếp trên Web Admin này!
-              </p>
+
+            {userRbacNotice && (
+              <div className="rounded-xl border border-sky-200 bg-[#eff6ff] px-4 py-3 text-xs font-bold text-[#1d4ed8]">
+                {userRbacNotice}
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#eff6ff] text-[#1d4ed8] font-extrabold uppercase">
+                  <tr>
+                    <th className="px-3.5 py-3">Mã Định Danh</th>
+                    <th className="px-3.5 py-3">Họ và Tên</th>
+                    <th className="px-3.5 py-3">Email Tài Khoản</th>
+                    <th className="px-3.5 py-3">Số Lượt Thi</th>
+                    <th className="px-3.5 py-3">Vai Trò Hiện Tại (Role)</th>
+                    <th className="px-3.5 py-3 text-right">
+                      Đổi Phân Quyền / Xóa (Chỉ ADMIN)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {adminUsers.map((u) => {
+                    const isRootAdmin =
+                      u.email.toLowerCase() === "admin@bluepass.edu.vn";
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50">
+                        <td className="px-3.5 py-3 font-mono font-bold text-[#0284c7]">
+                          {u.studentCode}
+                        </td>
+                        <td className="px-3.5 py-3 font-bold text-slate-900">
+                          {u.fullName}
+                        </td>
+                        <td className="px-3.5 py-3 text-slate-600">{u.email}</td>
+                        <td className="px-3.5 py-3 font-bold text-slate-700">
+                          {u.attemptCount ?? 0} bài
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                              u.role === "ADMIN"
+                                ? "bg-amber-400 text-slate-950"
+                                : u.role === "STAFF"
+                                ? "bg-emerald-600 text-white"
+                                : "bg-sky-100 text-[#0284c7]"
+                            }`}
+                          >
+                            {u.role === "ADMIN"
+                              ? "👑 ADMIN (Quản trị)"
+                              : u.role === "STAFF"
+                              ? "🎧 STAFF (Tư vấn)"
+                              : "🎓 STUDENT (Học viên)"}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 text-right">
+                          {currentUser.role === "ADMIN" ? (
+                            <div className="inline-flex items-center gap-2">
+                              <select
+                                disabled={isRootAdmin}
+                                value={u.role}
+                                onChange={(e) =>
+                                  handleUpdateUserRole(
+                                    u.id,
+                                    e.target.value as Role
+                                  )
+                                }
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 disabled:opacity-50"
+                              >
+                                <option value="STUDENT">STUDENT (Học viên)</option>
+                                <option value="STAFF">STAFF (Tư vấn viên)</option>
+                                <option value="ADMIN">ADMIN (Quản trị viên)</option>
+                              </select>
+                              {!isRootAdmin && u.id !== "user-student-1" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteUser(u.id, u.fullName)
+                                  }
+                                  className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-600 hover:text-white transition"
+                                  title="Xóa tài khoản này"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-400">
+                              Chỉ ADMIN được sửa
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
-              <span className="rounded bg-[#0284c7] px-2 py-0.5 text-[10px] font-bold text-white">
-                CÁCH 1: TRỰC TIẾP TRÊN WEB (ĐANG DÙNG)
-              </span>
-              <h3 className="text-sm font-extrabold text-slate-900">
-                Trung Tâm Quản Trị (/admin)
-              </h3>
-              <p className="text-slate-600">
-                Đăng tải/xóa đề thi ở Tab 2, xuất bảng điểm Excel ở Tab 1, đăng thông báo ở Tab 3. Dữ liệu tự động lưu xuống file{" "}
-                <code className="font-mono font-bold">.data-cache.json</code> trên ổ cứng.
-              </p>
+          {/* PostgreSQL 18 + pgAdmin 4 + GitHub Sync Info Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eff6ff] text-[#0284c7]">
+                <Database className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-[#1d4ed8]">
+                  CƠ SỞ DỮ LIỆU ĐỒNG BỘ TỨC THÌ (POSTGRESQL 18 + PGADMIN 4 + GITHUB)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Mọi thao tác thêm/xóa đề, nộp bài, đăng ký tài khoản hoặc đổi phân quyền đều tự động đồng bộ xuống PostgreSQL 18 trong 0.5 giây!
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
-              <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
-                CÁCH 2: PGADMIN 4 (KHI ĐƯA LÊN VPS DOCKER)
-              </span>
-              <h3 className="text-sm font-extrabold text-slate-900">
-                pgAdmin 4 + PostgreSQL 16
-              </h3>
-              <p className="text-slate-600">
-                Đã cấu hình sẵn trong <code className="font-mono font-bold">docker-compose.yml</code>. Khi chạy Docker trên VPS, truy cập{" "}
-                <code className="font-mono font-bold">http://VPS_IP:5050</code>{" "}
-                (<code className="font-mono">admin@bluepass.edu.vn</code> /{" "}
-                <code className="font-mono">AdminPg_2026!</code>) trên trình duyệt.
-              </p>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
+                <span className="rounded bg-[#0284c7] px-2 py-0.5 text-[10px] font-bold text-white">
+                  1. TRỰC TIẾP TRÊN WEB (/ADMIN)
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Trung Tâm Quản Trị & Phân Quyền
+                </h3>
+                <p className="text-slate-600">
+                  Đăng tải/xóa đề thi ở Tab 2, xuất bảng điểm Excel ở Tab 1, đăng/xóa thông báo ở Tab 3, phân quyền ở Tab 5. Lưu trữ bền vững tại{" "}
+                  <code className="font-mono font-bold">.data-cache.json</code>.
+                </p>
+              </div>
 
-            <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
-              <span className="rounded bg-[#1d4ed8] px-2 py-0.5 text-[10px] font-bold text-white">
-                CÁCH 3: GIT & GITHUB
-              </span>
-              <h3 className="text-sm font-extrabold text-slate-900">
-                Kho Lưu Trữ Mã Nguồn Git
-              </h3>
-              <p className="text-slate-600">
-                Kho Git local đã được khởi tạo sẵn trong thư mục dự án. Khi bạn tạo repo trên GitHub cá nhân, chỉ cần chạy{" "}
-                <code className="font-mono font-bold">git push -u origin main</code>.
-              </p>
+              <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
+                <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  2. PGADMIN 4 DESKTOP & POSTGRESQL 18
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Đồng bộ 12 Bảng Dữ Liệu Thật
+                </h3>
+                <p className="text-slate-600">
+                  Server: <code className="font-mono font-bold">localhost:5432</code> • Database:{" "}
+                  <code className="font-mono font-bold">bluepass_exam_db</code> &{" "}
+                  <code className="font-mono font-bold">postgres</code> (User{" "}
+                  <code className="font-mono font-bold">postgres</code> / Mật khẩu:{" "}
+                  <code className="font-mono font-bold">123456</code>).
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-[#eff6ff] p-4 space-y-1.5">
+                <span className="rounded bg-[#1d4ed8] px-2 py-0.5 text-[10px] font-bold text-white">
+                  3. TÊN MIỀN PUBLIC & GITHUB REPO
+                </span>
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Truy Cập Mọi Thiết Bị & Lưu Trữ Code
+                </h3>
+                <p className="text-slate-600">
+                  Link Web: <code className="font-mono font-bold">https://bluepass-ielts.serveousercontent.com</code> • GitHub:{" "}
+                  <code className="font-mono font-bold">nguyentanhao125-blip/bluepass-ielts-platform</code>.
+                </p>
+              </div>
             </div>
           </div>
         </div>

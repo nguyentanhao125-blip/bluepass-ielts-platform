@@ -21,9 +21,16 @@ export default function ChatWidget() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const userThreadId =
+    currentUser.id === "user-student-1"
+      ? "thread-student-1"
+      : `thread-${currentUser.id}`;
+
   const fetchThread = useCallback(async () => {
     try {
-      const res = await fetch("/api/chat?threadId=thread-student-1");
+      const res = await fetch(
+        `/api/chat?threadId=${encodeURIComponent(userThreadId)}`
+      );
       if (res.ok) {
         const data = await res.json();
         setThread(data.thread);
@@ -31,7 +38,7 @@ export default function ChatWidget() {
     } catch {
       // Ignore network polling errors
     }
-  }, []);
+  }, [userThreadId]);
 
   useEffect(() => {
     fetchThread();
@@ -57,7 +64,7 @@ export default function ChatWidget() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          threadId: thread?.id || "thread-student-1",
+          threadId: thread?.id || userThreadId,
           senderRole: "STUDENT",
           senderName: currentUser.fullName,
           content: textToSend,
@@ -80,7 +87,7 @@ export default function ChatWidget() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          threadId: thread?.id || "thread-student-1",
+          threadId: thread?.id || userThreadId,
           action: "REQUEST_HUMAN",
         }),
       });
@@ -101,7 +108,7 @@ export default function ChatWidget() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          threadId: thread?.id || "thread-student-1",
+          threadId: thread?.id || userThreadId,
           action: "RETURN_TO_AI",
         }),
       });

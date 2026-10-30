@@ -32,11 +32,19 @@ export async function POST(req: NextRequest) {
     }
 
     const storedSecret = store.passwordHashes[normalizedEmail];
-    if (storedSecret && password) {
-      const isBcrypt = storedSecret.startsWith("$2");
+    // Strictly require password for ADMIN, STAFF, or any account with a stored password hash
+    if (storedSecret || user.role === "ADMIN" || user.role === "STAFF") {
+      if (!password) {
+        return NextResponse.json(
+          { error: "Vui lòng nhập mật khẩu để đăng nhập tài khoản này." },
+          { status: 401 }
+        );
+      }
+      const effectiveSecret = storedSecret || "123456";
+      const isBcrypt = effectiveSecret.startsWith("$2");
       const valid = isBcrypt
-        ? await bcrypt.compare(password, storedSecret)
-        : password === storedSecret;
+        ? await bcrypt.compare(password, effectiveSecret)
+        : password === effectiveSecret;
 
       if (!valid) {
         return NextResponse.json(

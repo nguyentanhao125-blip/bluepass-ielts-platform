@@ -762,8 +762,18 @@ function StudentPortalContent() {
                 <div className="rounded-xl bg-slate-50 p-4 border border-slate-200">
                   <p className="text-slate-500">Mục tiêu đầu ra & Cấp độ hiện tại</p>
                   <p className="mt-1 text-sm font-bold text-[#1d4ed8]">
-                    IELTS {currentUser.targetBand.toFixed(1)} •{" "}
-                    {currentUser.currentLevel}
+                    IELTS {(currentUser.targetBand ?? 7.0).toFixed(1)} •{" "}
+                    {currentUser.currentLevel || "IELTS Academic"}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-[#eff6ff] p-4 border border-sky-200 sm:col-span-2">
+                  <p className="text-slate-500">Cấp độ Phân quyền Hệ thống (RBAC Role)</p>
+                  <p className="mt-1 text-sm font-extrabold text-[#0284c7]">
+                    {currentUser.role === "ADMIN"
+                      ? "👑 QUẢN TRỊ VIÊN TỐI CAO (ADMIN) — Toàn quyền quản trị đề thi, bảng điểm, thông báo & tài khoản"
+                      : currentUser.role === "STAFF"
+                      ? "🎧 TƯ VẤN VIÊN / GIÁO VIÊN (STAFF) — Quyền xem điểm, đăng thông báo xếp lớp & hỗ trợ chat học viên"
+                      : "🎓 HỌC VIÊN (STUDENT) — Quyền luyện đề, thi xếp lớp, học từ vựng & tra cứu kết quả cá nhân"}
                   </p>
                 </div>
               </div>

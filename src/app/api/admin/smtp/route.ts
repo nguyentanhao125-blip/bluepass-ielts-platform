@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSmtpState, saveSmtpState, sendOtpVerificationEmail } from "@/lib/mailer";
+import { getAuthenticatedUser } from "@/lib/session";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const caller = getAuthenticatedUser(req);
+  const isAdmin = caller?.role === "ADMIN";
   const state = getSmtpState();
   return NextResponse.json({
-    smtpUser: state.smtpUser,
+    smtpUser: isAdmin ? state.smtpUser : "nguyentanhao125@gmail.com",
     hasPassword: Boolean(state.smtpPass),
-    maskedPass: state.smtpPass
-      ? `${state.smtpPass.slice(0, 4)} •••• •••• ${state.smtpPass.slice(-4)}`
-      : "",
+    maskedPass:
+      isAdmin && state.smtpPass
+        ? `${state.smtpPass.slice(0, 4)} •••• •••• ${state.smtpPass.slice(-4)}`
+        : "",
     senderName: state.senderName,
     enabled: state.enabled,
   });

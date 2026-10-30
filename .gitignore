@@ -12,3 +12,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .data-cache.json
+.telegram-config.json
+.smtp-config.json
